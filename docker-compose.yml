@@ -1,0 +1,131 @@
+services:
+  # ── PostgreSQL Primary ──────────────────────────────────────────────────────
+  postgres-primary:
+    image: bitnami/postgresql:latest
+    container_name: postgres-primary
+    environment:
+      POSTGRESQL_REPLICATION_MODE: master
+      POSTGRESQL_REPLICATION_USER: repl_user
+      POSTGRESQL_REPLICATION_PASSWORD: repl_password
+      POSTGRESQL_USERNAME: weather_user
+      POSTGRESQL_PASSWORD: weather_pass
+      POSTGRESQL_DATABASE: weather_db
+    volumes:
+      - postgres_primary_data:/bitnami/postgresql
+      - ./docker/postgres/seed.sql:/docker-entrypoint-initdb.d/seed.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "weather_user", "-d", "weather_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── PostgreSQL Replica 1 ────────────────────────────────────────────────────
+  postgres-replica-1:
+    image: bitnami/postgresql:latest
+    container_name: postgres-replica-1
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_MASTER_HOST: postgres-primary
+      POSTGRESQL_MASTER_PORT_NUMBER: 5432
+      POSTGRESQL_REPLICATION_USER: repl_user
+      POSTGRESQL_REPLICATION_PASSWORD: repl_password
+      POSTGRESQL_USERNAME: weather_user
+      POSTGRESQL_PASSWORD: weather_pass
+    volumes:
+      - postgres_replica1_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "weather_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── PostgreSQL Replica 2 ────────────────────────────────────────────────────
+  postgres-replica-2:
+    image: bitnami/postgresql:latest
+    container_name: postgres-replica-2
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_MASTER_HOST: postgres-primary
+      POSTGRESQL_MASTER_PORT_NUMBER: 5432
+      POSTGRESQL_REPLICATION_USER: repl_user
+      POSTGRESQL_REPLICATION_PASSWORD: repl_password
+      POSTGRESQL_USERNAME: weather_user
+      POSTGRESQL_PASSWORD: weather_pass
+    volumes:
+      - postgres_replica2_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "weather_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── App ─────────────────────────────────────────────────────────────────────
+  app:
+    build: .
+    container_name: weather-app
+    depends_on:
+      postgres-replica-1:
+        condition: service_healthy
+      postgres-replica-2:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      REDIS_ADDR: redis:6379
+      DB_REPLICA_1_URL: postgres://weather_user:weather_pass@postgres-replica-1:5432/weather_db?sslmode=disable
+      DB_REPLICA_2_URL: postgres://weather_user:weather_pass@postgres-replica-2:5432/weather_db?sslmode=disable
+      CACHE_TTL_MINUTES: 15
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - app
+
+  # ── Grafana ─────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
+
+volumes:
+  postgres_primary_data:
+  postgres_replica1_data:
+  postgres_replica2_data:
+  grafana_data:

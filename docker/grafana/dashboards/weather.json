@@ -1,0 +1,148 @@
+{
+  "title": "Weather App — Cache vs No-Cache",
+  "uid": "weather-app",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(http_request_duration_seconds_count{handler=\"cached\"}[1m])",
+          "legendFormat": "cached"
+        },
+        {
+          "expr": "rate(http_request_duration_seconds_count{handler=\"no_cache\"}[1m])",
+          "legendFormat": "no-cache"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "p95 Latency Comparison",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{handler=\"cached\"}[1m]))",
+          "legendFormat": "p95 cached"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{handler=\"no_cache\"}[1m]))",
+          "legendFormat": "p95 no-cache"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "p50 Latency Comparison",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{handler=\"cached\"}[1m]))",
+          "legendFormat": "p50 cached"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{handler=\"no_cache\"}[1m]))",
+          "legendFormat": "p50 no-cache"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "p99 Latency Comparison",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{handler=\"cached\"}[1m]))",
+          "legendFormat": "p99 cached"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{handler=\"no_cache\"}[1m]))",
+          "legendFormat": "p99 no-cache"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Cache Hit Rate",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 80 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(cache_hits_total[1m]) / (rate(cache_hits_total[1m]) + rate(cache_misses_total[1m])) * 100",
+          "legendFormat": "hit rate %"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Cache Hits vs Misses",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(cache_hits_total[1m])",
+          "legendFormat": "hits/s"
+        },
+        {
+          "expr": "rate(cache_misses_total[1m])",
+          "legendFormat": "misses/s"
+        }
+      ]
+    }
+  ]
+}
